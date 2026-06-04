@@ -1,0 +1,86 @@
+#1 GIT Provisioning
+
+#To install git on local machine 
+sudo apt-get install -y git
+
+#To configure username on git
+git config --global user.name "Gbolahan Idowu"
+
+#To configure email on git
+git config --global user.email "idowugbolahan449@gmail.com"
+
+#To add the git directory from the working directory to the staging area 
+git add . 
+
+#To commit the changes made to the local repository 
+git commit -m “File system has been created”
+
+#To link the local repository on my local host to the github repository
+git remote add origin https://github.com/Idowu-Gbolahan/Security-Hardening.git
+
+#To push changes made and configurations on my local repository to the github repository for the first time
+git push -u origin master 
+
+#2 .gitignore configuration:
+
+#To change directory to the local repository’s directory
+cd ~/Projects/Security Hardening Projects 
+
+#To create the gitignore file
+touch .gitignore
+
+#3 GCP provisioning 
+
+#To install google cloud sdk on my local host
+curl https://sdk.cloud.google.com | bash 
+exec -l $SHELL 
+
+#To initialize and authenticate my GCP console account with the gcloud sdk
+gcloud init
+
+#4 GCP IAM configuration 
+
+#To create an iam user that will serve as the serviceusageadmin to gain access to manage google's APIs
+gcloud projects add-iam-policy-binding security-hardening-lab-498320 \ 
+--member="user:idowugbolahan449@gmail.com" \
+--role="roles/serviceusage.serviceUsageAdmin"
+
+#To create dedicated service accounts, following least-privilege principles, that will gain access to certain processes and operations in google cloud 
+
+#Three commands to create a cicd deployer to handle CI/CD deploymets, have access to manage VMs, access to push docker images to artifact registry, and for google's cloud build to be able to deploy docker containers when needed 
+1. gcloud iam service-accounts create cicd-deployer --display-name="CI/CD Deployer" — Creates a robot account whose only job is to handle CI/CD deployments. After this runs, GCP creates an identity: cicd-deployer@security-hardening-lab-498320.iam.gserviceaccount.com. At this point it exists but has zero permissions — it can't do anything yet.
+
+2. gcloud projects add-iam-policy-binding security-hardening-lab-498320 \
+--member="serviceAccount:cicd-deployer@security-hardening-lab-498320.iam.gserviceaccount.com" \
+--role="roles/compute.instanceAdmin.v1"
+
+3. gcloud projects add-iam-policy-binding security-hardening-lab-498320 \
+--member="serviceAccount:cicd-deployer@security-hardening-lab-498320.iam.gserviceaccount.com" \
+--role="roles/artifactregistry.writer"
+
+#Two commands to create VM runtime service account which will run on the VM, and grant it permission to read secrets from secret manager to grab TLS certificates, private keys, and other sensitive configs
+1. gcloud iam service-accounts create vm-runtime \
+--display-name="VM Runtime Account"
+
+2. gcloud projects add-iam-policy-binding security-hardening-lab-498320 \
+--member="serviceAccount:vm-runtime@security-hardening-lab-498320.iam.gserviceaccount.com" \
+--role="roles/secretmanager.secretAccessor" 
+
+#5 GCP APIs 
+
+#To enable all required APIs in this project in one command:
+gcloud services enable \
+  compute.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  secretmanager.googleapis.com \
+  logging.googleapis.com \
+  monitoring.googleapis.com \
+  securitycenter.googleapis.com \
+  containerscanning.googleapis.com
+
+***Refer to the documentation for what each API does
+
+
+#6 GCP Infrastructure configuration 
+
