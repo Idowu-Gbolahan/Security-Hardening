@@ -1,0 +1,16 @@
+# Keys and Certificate
+*.pem
+*.key
+*.p12
+# Secrets
+secrets/
+.env
+.env.*
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+# Python
+**/__pycache__/
+# macOS
+.DS_Store
