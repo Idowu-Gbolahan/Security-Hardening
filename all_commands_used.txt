@@ -84,3 +84,99 @@ gcloud services enable \
 
 #6 GCP Infrastructure configuration 
 
+#To create a VPC in google cloud from the google cli with a custom subnet
+gcloud compute networks create security-vpc \
+ --subnet-mode=custom
+
+#To create a subnet for the servers with a CIDR of 10.10.0.0/24
+gcloud compute networks subnets create servers-subnet \
+  --network=security-vpc \
+  --region=us-central1 \
+  --range=10.10.0.0/24
+
+#To allow HTTPS inbound from any IP to the security vpc on ONLY VMs with a "web-server" tag on them.
+gcloud compute firewall-rules create allow-https \
+--network=security-vpc \
+--allow=tcp:443 \
+--source-ranges=0.0.0.0/0 \
+--target-tags=web-server
+
+#To allow SSH access to VMs tagged as web-server only from my IP through Google's Identity-Aware Proxy IP address range.
+gcloud compute firewall-rules create allow-iap-ssh \
+--network=security-vpc \
+--allow=tcp:22 \
+--source-ranges=35.235.240.0/20 \
+--target-tags=web-server
+
+#To grant the user, Idowugbolahan449@gmail.com access to the VM as a sudo user.
+gcloud projects add-iam-policy-binding security-hardening-lab-498320 \
+  --member="user:idowugbolahan449@gmail.com" \
+  --role="roles/compute.osAdminLogin"
+
+#To grant the user, idowugbolahan449@gmail.com an IAP tunnel role.
+gcloud projects add-iam-policy-binding security-hardening-lab-498320 \
+  --member="user:idowugbolahan449@gmail.com" \
+  --role="roles/iap.tunnelResourceAccessor"
+
+#To deny all other traffic 
+gcloud compute firewall-rules create deny-all-ingress \
+--network=security-vpc \
+--action=deny \
+--direction=ingress \
+--rules=all \
+--priority=65534
+
+#To provision the jewelry app server (smykker) with hardening
+gcloud compute instances create smykker-server \
+  --zone=us-central1-a \
+  --machine-type=e2-medium \
+  --network=security-vpc \
+  --subnet=servers-subnet \
+  --image-family=ubuntu-2204-lts \
+  --image-project=ubuntu-os-cloud \
+  --boot-disk-size=50GB \
+  --boot-disk-type=pd-ssd \
+  --service-account=vm-runtime@security-hardening-lab-498320.iam.gserviceaccount.com \
+  --scopes=cloud-platform \
+  --tags=web-server \
+  --shielded-secure-boot \
+  --shielded-vtpm \
+  --shielded-integrity-monitoring \
+  --no-address \
+  --metadata=block-project-ssh-keys=true,enable-oslogin=TRUE
+
+#Refer to the documentation to learn more about this configuration
+
+#To create a private Docker image registry inside the GCP project in the same location (us-central1) as the subnet where the server is.
+gcloud artifacts repositories create security-hardening-repo \
+--repository-format=docker \
+--location=us-central1 \
+--description="Hardened Docker images"
+
+#To configures the local Docker installation to use the GCP credentials when communicating with Artifact Registry.
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+#7 TLS CERTIFICATE GENERATION AND KEY MANAGEMENT
+
+#To generate a self-signed TLS certificate and private key pair that the Nginx server will use to serve HTTPS traffic.
+openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+ -keyout server.key -out server.crt \
+ -subj "/C=NG/ST=Lagos/L=Lagos/O=Smykker/OU=Engineering/CN=smykker.internal" \
+ -addext "subjectAltName=DNS:smykker.internal,DNS:localhost,IP:10.10.0.2" 
+
+#To read the full certificate details
+openssl x509 -in server.crt -text -noout
+
+#To upload the TLS certificate file into GCP Secret Manager, creating a secret named smykker-tls-cert
+gcloud secrets create smykker-tls-cert --data-file=server.crt 
+
+#To upload the private key file into GCP secret management 
+gcloud secrets create smykker-tls-key --data-file=server.key
+
+#To if the public and private key are mathematically linked to each other.
+openssl x509 -noout -modulus -in server.crt | md5sum
+openssl rsa  -noout -modulus -in server.key | md5sum 
+
+#To securely delete both key files from the local machine.
+shred -u server.key server.crt
+
