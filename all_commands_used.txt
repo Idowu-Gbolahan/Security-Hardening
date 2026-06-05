@@ -153,7 +153,7 @@ gcloud artifacts repositories create security-hardening-repo \
 --location=us-central1 \
 --description="Hardened Docker images"
 
-#To configures the local Docker installation to use the GCP credentials when communicating with Artifact Registry.
+#To configure the local Docker installation to use the GCP credentials when communicating with Artifact Registry.
 gcloud auth configure-docker us-central1-docker.pkg.dev
 
 #7 TLS CERTIFICATE GENERATION AND KEY MANAGEMENT
@@ -173,7 +173,7 @@ gcloud secrets create smykker-tls-cert --data-file=server.crt
 #To upload the private key file into GCP secret management 
 gcloud secrets create smykker-tls-key --data-file=server.key
 
-#To if the public and private key are mathematically linked to each other.
+#To check if the public and private key are mathematically linked to each other.
 openssl x509 -noout -modulus -in server.crt | md5sum
 openssl rsa  -noout -modulus -in server.key | md5sum 
 
