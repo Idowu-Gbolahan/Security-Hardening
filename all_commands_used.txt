@@ -92,7 +92,19 @@ gcloud compute networks create security-vpc \
 gcloud compute networks subnets create servers-subnet \
   --network=security-vpc \
   --region=us-central1 \
-  --range=10.10.0.0/24
+  --range=10.10.0.0/24 
+
+#To create a cloud router that serves as the control plane to direct traffic and house NAT pools.
+gcloud compute routers create security-router \
+  --network=security-vpc \
+  --region=us-central1
+
+#To create a NAT gateway
+gcloud compute routers nats create security-nat \
+--router=security-router \
+--region=us-central1 \
+--auto-allocate-nat-external-ips \
+--nat-all-subnet-ip-ranges
 
 #To allow HTTPS inbound from any IP to the security vpc on ONLY VMs with a "web-server" tag on them.
 gcloud compute firewall-rules create allow-https \
@@ -179,4 +191,17 @@ openssl rsa  -noout -modulus -in server.key | md5sum
 
 #To securely delete both key files from the local machine.
 shred -u server.key server.crt
+
+
+#8 LINUX SECURITY HARDENING
+
+#To open an SSH connection on the specified VM through Google’s IAP IP address range.
+gcloud compute ssh smykker-server \
+--tunnel-through-iap \
+--zone=us-central1-a 
+
+#To update the software packages and dependencies, and remove packages that were installed as dependencies but are no longer needed.
+sudo apt-get update -y && sudo apt-get upgrade -y
+sudo apt-get dist-upgrade -y
+sudo apt-get autoremove -y --purge 
 
