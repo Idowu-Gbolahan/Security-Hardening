@@ -203,5 +203,14 @@ gcloud compute ssh smykker-server \
 #To update the software packages and dependencies, and remove packages that were installed as dependencies but are no longer needed.
 sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get dist-upgrade -y
-sudo apt-get autoremove -y --purge 
+sudo apt-get autoremove -y --purge
 
+#To configure automatic security updates using the unattended-upgrades service
+sudo apt-get install -y unattended-upgrades
+echo 'Unattended-Upgrade::Automatic-Reboot "false";' | sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+
+#To lock the root account
+sudo passwd -l root
+
+#To create a dedicated appuser to run docker commands and to add the user to the Docker group
+sudo useradd -m -s /bin/bash -G docker appuser 
