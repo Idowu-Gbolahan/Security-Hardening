@@ -168,6 +168,112 @@ gcloud artifacts repositories create security-hardening-repo \
 #To configure the local Docker installation to use the GCP credentials when communicating with Artifact Registry.
 gcloud auth configure-docker us-central1-docker.pkg.dev
 
+#To create a GCP firewall rule that allows health check traffic from Google cloud load balancers to reach the VM
+gcloud compute firewall-rules create allow-lb-healthcheck \
+--network=security-vpc \
+--allow=tcp:443 \
+--source-ranges=130.211.0.0/22,35.191.0.0/16 \ 
+--target-tags=web-server
+
+#To reserve a static external IP for the load balance
+gcloud compute addresses create smykker-lb-ip \
+  --global \
+  --description="Smykker load balancer static IP"
+
+#To check the IP assigned 
+gcloud compute addresses describe smykker-lb-ip \
+  --global \
+  --format="get(address)"
+
+#To create and add a backend group that the loadbalancer will be attached to 
+gcloud compute instance-groups unmanaged create smykker-group \
+--zone=us-central1-a 
+gcloud compute instance-groups unmanaged add-instances smykker-group \
+--zone=us-central1-a \
+ --instances=smykker-server
+
+#To define the named port the loadbalancer will forward traffic to 
+gcloud compute instance-groups set-named-ports smykker-group \
+--zone=us-central1-a \
+--named-ports=https:443
+
+#To create a health check for the servers via the loadbalancer
+gcloud compute health-checks create http smykker-health-check \
+--port=443 \
+--request-path=/health \
+--check-interval=10s \
+--timeout=5s \
+--healthy-threshold=2 \
+--unhealthy-threshold=3
+
+#To create a backend service
+gcloud compute backend-services create smykker-backend \
+--protocol=HTTP \
+--health-checks=smykker-health-check \
+--global 
+gcloud compute backend-services add-backend smykker-backend \
+--instance-group=smykker-group \
+--instance-group-zone=us-central1-a \
+--global
+
+#To create a URL map and HTTPs proxy
+gcloud compute url-maps create smykker-url-map \
+--default-service=smykker-backend
+gcloud compute target-https-proxies create smykker-https-proxy \
+--url-map=smykker-url-map
+--ssl-certificates=smykker-ssl-cert \
+  --global
+
+#To create an SSL certificate for the loadbalancer & backend service set
+gcloud compute ssl-certificates create smykker-ssl-cert \
+--domains=smykkerlab.com,www.smykkerlab.com \
+ --global
+
+#To bind the forwarding rule to the public IP to make the loadbalancer live
+gcloud compute forwarding-rules create smykker-forwarding-rule \
+--address=smykker-lb-ip \
+--target-https-proxy=smykker-https-proxy \
+--ports=443 \
+--global
+
+#To create a WAF
+gcloud compute security-policies create smykker-waf \
+  --description="WAF policy for smykker server"
+
+#To configure WAF rules 
+gcloud compute security-policies rules create 1000 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('xss-stable')" \
+  --action=deny-403 \
+  --description="Block XSS attacks"
+gcloud compute security-policies rules create 1001 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('sqli-stable')" \
+  --action=deny-403 \
+  --description="Block SQL injection"
+gcloud compute security-policies rules create 1002 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('rfi-stable')" \
+  --action=deny-403 \
+  --description="Block remote file inclusion"
+gcloud compute security-policies rules create 2000 \
+  --security-policy=smykker-waf \
+  --expression="true" \
+  --action=rate-based-ban \
+  --rate-limit-threshold-count=1000 \
+  --rate-limit-threshold-interval-sec=60 \
+  --ban-duration-sec=3600 \
+  --conform-action=allow \
+  --exceed-action=deny-429 \
+  --enforce-on-key=IP \
+  --description="Rate limit all traffic"
+
+#To attach WAF to backend service  
+gcloud compute backend-services update smykker-backend \
+  --security-policy=smykker-waf \
+  --global
+
+
 #7 TLS CERTIFICATE GENERATION AND KEY MANAGEMENT
 
 #To generate a self-signed TLS certificate and private key pair that the Nginx server will use to serve HTTPS traffic.

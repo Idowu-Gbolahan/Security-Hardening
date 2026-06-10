@@ -1,0 +1,9 @@
+# Run these one by one in Git Bash:
+
+echo 'export MSYS_NO_PATHCONV=1' >> ~/.bashrc
+echo 'export MSYS2_ARG_CONV_EXCL="*"' >> ~/.bashrc
+echo 'export CLOUDSDK_PYTHON="C:/Users/DELL/AppData/Local/Programs/Python/Python313/python.exe"' >> ~/.bashrc
+echo 'alias gcloud="/c/Users/DELL/google-cloud-sdk/bin/gcloud.cmd"' >> ~/.bashrc
+
+# Reload bashrc
+source ~/.bashrc
