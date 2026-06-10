@@ -240,7 +240,7 @@ gcloud compute forwarding-rules create smykker-forwarding-rule \
 gcloud compute security-policies create smykker-waf \
   --description="WAF policy for smykker server"
 
-#To configure WAF rules 
+#To configure WAF rules to block OWASP top 10
 gcloud compute security-policies rules create 1000 \
   --security-policy=smykker-waf \
   --expression="evaluatePreconfiguredExpr('xss-stable')" \
@@ -256,6 +256,42 @@ gcloud compute security-policies rules create 1002 \
   --expression="evaluatePreconfiguredExpr('rfi-stable')" \
   --action=deny-403 \
   --description="Block remote file inclusion"
+gcloud compute security-policies rules create 1003 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('lfi-stable')" \
+  --action=deny-403 \
+  --description="Block local file inclusion"
+gcloud compute security-policies rules create 1004 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('rce-stable')" \
+  --action=deny-403 \
+  --description="Block remote code execution"
+gcloud compute security-policies rules create 1005 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('methodenforcement-stable')" \
+  --action=deny-403 \
+  --description="Block disallowed HTTP methods"
+gcloud compute security-policies rules create 1006 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('scannerdetection-stable')" \
+  --action=deny-403 \
+  --description="Block vulnerability scanners"
+gcloud compute security-policies rules create 1007 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('protocolattack-stable')" \
+  --action=deny-403 \
+  --description="Block HTTP protocol attacks"
+gcloud compute security-policies rules create 1008 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('php-stable')" \
+  --action=deny-403 \
+  --description="Block PHP injection attacks"
+gcloud compute security-policies rules create 1009 \
+  --security-policy=smykker-waf \
+  --expression="evaluatePreconfiguredExpr('sessionfixation-stable')" \
+  --action=deny-403 \
+  --description="Block session fixation attacks"
+
 gcloud compute security-policies rules create 2000 \
   --security-policy=smykker-waf \
   --expression="true" \
@@ -272,6 +308,10 @@ gcloud compute security-policies rules create 2000 \
 gcloud compute backend-services update smykker-backend \
   --security-policy=smykker-waf \
   --global
+
+#To check the WAF configuration 
+gcloud compute security-policies describe smykker-waf \
+--format="table(rules.priority,rules.action,rules.description)"
 
 
 #7 TLS CERTIFICATE GENERATION AND KEY MANAGEMENT
@@ -318,5 +358,33 @@ echo 'Unattended-Upgrade::Automatic-Reboot "false";' | sudo tee -a /etc/apt/apt.
 #To lock the root account
 sudo passwd -l root
 
+#To install docker
+sudo apt-get remove -y docker docker-engine docker.io containerd runc
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+| sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg 
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
+
+sudo apt-get update && \
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+#To verify docker was installed
+docker --version
+sudo systemctl status docker
+
 #To create a dedicated appuser to run docker commands and to add the user to the Docker group
 sudo useradd -m -s /bin/bash -G docker appuser 
+
+#To install, configure, and test the configurations on pwquality
+sudo apt-get install -y libpam-pwquality
+sudo sed -i 's/# minlen = 8/minlen = 14/' /etc/security/pwquality.conf
+sudo sed -i 's/# minclass = 0/minclass = 4/' /etc/security/pwquality.conf 
+sudo sed -i 's/# maxrepeat = 0/maxrepeat = 3/' /etc/security/pwquality.conf
+grep -E "minlen|minclass|maxrepeat" /etc/security/pwquality.conf
+sudo useradd -m -s /bin/bash testuser
+sudo passwd testuser
+
+#
+
