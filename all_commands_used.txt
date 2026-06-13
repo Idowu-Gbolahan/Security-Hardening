@@ -341,23 +341,28 @@ shred -u server.key server.crt
 
 #8 LINUX SECURITY HARDENING
 
+(a)Logging in to the Linux VM via IAP
 #To open an SSH connection on the specified VM through Google’s IAP IP address range.
 gcloud compute ssh smykker-server \
 --tunnel-through-iap \
 --zone=us-central1-a 
 
+(b)To update the linux VM and remove dependencies it does not need
 #To update the software packages and dependencies, and remove packages that were installed as dependencies but are no longer needed.
 sudo apt-get update -y && sudo apt-get upgrade -y
 sudo apt-get dist-upgrade -y
 sudo apt-get autoremove -y --purge
 
+(c)Automatic security update
 #To configure automatic security updates using the unattended-upgrades service
 sudo apt-get install -y unattended-upgrades
 echo 'Unattended-Upgrade::Automatic-Reboot "false";' | sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
 
+(d)Root locking
 #To lock the root account
 sudo passwd -l root
 
+(e)Hardened docker installation
 #To install docker
 sudo apt-get remove -y docker docker-engine docker.io containerd runc
 
@@ -377,6 +382,7 @@ sudo systemctl status docker
 #To create a dedicated appuser to run docker commands and to add the user to the Docker group
 sudo useradd -m -s /bin/bash -G docker appuser 
 
+(f)Password policy setup
 #To install, configure, and test the configurations on pwquality
 sudo apt-get install -y libpam-pwquality
 sudo sed -i 's/# minlen = 8/minlen = 14/' /etc/security/pwquality.conf
@@ -386,5 +392,118 @@ grep -E "minlen|minclass|maxrepeat" /etc/security/pwquality.conf
 sudo useradd -m -s /bin/bash testuser
 sudo passwd testuser
 
-#
+(g)ssh hardening
+#To create a backup of the configuration, in case something breaks
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
+#To restore the backed up configuration as the running configuration if something breaks. Only use this command if something breaks!
+sudo cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config 
+
+#sshd_config.d hardening 
+sudo tee /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'
+Protocol 2
+PermitRootLogin no
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+MaxAuthTries 3
+MaxSessions 2
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+Ciphers aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512,hmac-sha2-256
+KexAlgorithms curve25519-sha256,diffie-hellman-group16-sha512
+EOF
+
+#To restart ssh so that the settings are applied, and to verify it is running
+sudo systemctl restart sshd 
+sudo systemctl status sshd
+
+(h)UFW configuration
+#To install the UFW and configure it with rules
+sudo apt-get install ufw -y
+sudo ufw disable
+sudo ufw default deny incoming
+sudo ufw default deny outgoing
+sudo ufw allow out 443/tcp
+sudo ufw allow out 80/tcp 
+sudo ufw allow out 53/udp 
+sudo ufw allow out 123/udp
+sudo ufw allow in 443/tcp
+sudo ufw allow in from 35.235.240.0/20 to any port 22 proto tcp
+sudo ufw enable 
+
+(i)fail2ban configuration
+#To install fail2ban
+sudo apt-get install -y fail2ban
+
+#To configure the jail.local file in fail2ban 
+sudo tee /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 3
+[sshd]
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+maxretry = 3
+EOF
+
+#To enable fail2ban immediately, ensuring it starts on reboot.
+sudo systemctl enable fail2ban --now
+
+(j)Kernel hardening
+#To configure kernel hardening via sysctl.d
+
+sudo tee /etc/sysctl.d/99-hardening.conf << 'EOF'
+# Network hardening
+net.ipv4.ip_forward = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.tcp_syncookies = 1
+# Memory protection
+kernel.randomize_va_space = 2
+kernel.kptr_restrict = 2
+kernel.dmesg_restrict = 1
+kernel.perf_event_paranoid = 3
+fs.suid_dumpable = 0
+EOF
+
+#To force the new configuration to be added to the kernel without a system reboot
+sudo sysctl -p /etc/sysctl.d/99-hardening.conf
+
+(k)auditd
+
+#To install the audit daemon and plugings 
+sudo apt-get install -y auditd audispd-plugins
+
+#To configure hardened rules for auditd
+sudo tee -a /etc/audit/rules.d/hardening.rules << 'EOF'
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/sudoers -p wa -k sudoers
+-w /etc/ssh/sshd_config -p wa -k sshd
+-a always,exit -F arch=b32 -S execve -k exec
+-a always,exit -F arch=b64 -S execve -k exec
+-a always,exit -F arch=b32 -S open -F exit=-EACCES -k access
+-a always,exit -F arch=b64 -S open -F exit=-EACCES -k access
+EOF
+
+#to compile all rules in /etc/audit/rules.d/ into one binary ruleset and load them into the kernel.
+sudo augenrules --load 
+
+#To enable auditd on boot and to start it now
+sudo systemctl enable auditd --now
+
+
+#9 DOCKER SECURITY HARDENING
