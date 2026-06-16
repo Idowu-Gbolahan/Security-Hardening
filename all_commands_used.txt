@@ -507,3 +507,54 @@ sudo systemctl enable auditd --now
 
 
 #9 DOCKER SECURITY HARDENING
+
+#To configure the docker daemon through the json file
+sudo mkdir -p /etc/docker
+
+sudo tee /etc/docker/daemon.json << 'EOF'
+{
+  "icc": false,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "live-restore": true,
+  "userland-proxy": false,
+  "no-new-privileges": true,
+  "userns-remap": "default",
+  "storage-driver": "overlay2",
+  "experimental": false,
+  "default-ulimits": {
+    "nofile": {"Name":"nofile","Hard":64000,"Soft":64000}
+  },
+  "seccomp-profile": "/etc/docker/seccomp-default.json"
+}
+EOF
+
+#To install the seccomp file 
+sudo curl -o /etc/docker/seccomp-default.json \
+  https://raw.githubusercontent.com/moby/moby/master/profiles/seccomp/default.json
+
+#To configure docker content trust
+echo 'export DOCKER_CONTENT_TRUST=1' | sudo tee -a /etc/environment
+export DOCKER_CONTENT_TRUST=1
+
+#To setup cosign 
+sudo curl -L -o /usr/local/bin/cosign \
+  https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+sudo chmod +x /usr/local/bin/cosign
+cosign version
+cosign verify --key cosign.pub \
+us-central1-docker.pkg.dev/security-hardening-lab-498320/security-hardening-repo/nginx:latest
+
+
+#10 NGINX SECURITY HARDENING
+
+#To copy the nginx docker configuration from laptop to VM using secure copy
+gcloud compute scp --recurse docker/nginx \  
+idowugbolahan449_gmail_com@smykker-server:/home/idowugbolahan449_gmail_com/nginx-build 
+ --tunnel-through-iap \ 
+ --zone=us-central1-a
+
+
