@@ -557,4 +557,8 @@ idowugbolahan449_gmail_com@smykker-server:/home/idowugbolahan449_gmail_com/nginx
  --tunnel-through-iap \ 
  --zone=us-central1-a
 
+#To copy the nginx-build file from the gbolahan user to the appuser, and then change its permission
+sudo cp -r /home/idowugbolahan449_gmail_com/nginx-build /home/appuser/
+sudo chown -R appuser:appuser /home/appuser/nginx-build
+
 
