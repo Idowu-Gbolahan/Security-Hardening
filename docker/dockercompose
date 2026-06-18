@@ -1,0 +1,71 @@
+version: '3.9'
+
+networks:
+  frontend:
+    driver: bridge
+    internal: false
+  backend:
+    driver: bridge
+    internal: true
+
+services:
+
+  nginx:
+    image: us-central1-docker.pkg.dev/security-hardening-lab-498320/security-hardening-repo/nginx:1.0
+    read_only: true
+    user: '1001:1001'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    networks: [frontend, backend]
+    ports:
+      - "443:8443"
+    volumes:
+      - type: bind
+        source: /run/secrets
+        target: /etc/nginx/certs
+        read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+      - /var/run:rw,noexec,nosuid,size=8m
+    mem_limit: 256m
+    pids_limit: 50
+    restart: unless-stopped
+    depends_on: [apache2]
+
+  apache2:
+    image: us-central1-docker.pkg.dev/security-hardening-lab-498320/security-hardening-repo/apache2:1.0
+    read_only: true
+    user: '1001:1001'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    networks: [backend]
+    expose: ['8080']
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/run/apache2:rw,noexec,nosuid,size=8m
+      - /var/log/apache2:rw,noexec,nosuid,size=32m
+    mem_limit: 256m
+    pids_limit: 50
+    restart: unless-stopped
+    depends_on: [app]
+
+  app:
+    image: us-central1-docker.pkg.dev/security-hardening-lab-498320/security-hardening-repo/app:1.0
+    read_only: true
+    user: '1001:1001'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    networks: [backend]
+    expose: ['5000']
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      - APP_SECRET_KEY_FILE=/run/secrets/app-secret
+    mem_limit: 256m
+    pids_limit: 50
+    restart: unless-stopped

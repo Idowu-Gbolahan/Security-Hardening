@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>SmykkerPay — Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dashboard-body">
+
+    <!-- Top Navigation -->
+    <nav class="topnav">
+        <div class="topnav-left">
+            <div class="brand-mark small">S</div>
+            <span class="brand-name">SmykkerPay</span>
+        </div>
+        <div class="topnav-right">
+            <span class="nav-user">{{ user.name }}</span>
+            <span class="nav-role">{{ user.role }}</span>
+            <form method="POST" action="/logout" style="display:inline;">
+                <button type="submit" class="btn btn-ghost btn-sm">Sign out</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="dashboard-main">
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Welcome back, {{ user.name.split()[0] }}</p>
+            </div>
+            <div class="status-pill status-green">
+                <span class="status-dot"></span>
+                All systems operational
+            </div>
+        </div>
+
+        <!-- Balance Cards -->
+        <div class="cards-grid">
+
+            <div class="card card-highlight">
+                <div class="card-label">Available Balance</div>
+                <div class="card-value">{{ user.balance }}</div>
+                <div class="card-sub">Updated just now</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Total Transactions</div>
+                <div class="card-value card-value-md">{{ transactions|length }}</div>
+                <div class="card-sub">This month</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Security Status</div>
+                <div class="card-value card-value-md status-text-green">Secured</div>
+                <div class="card-sub">TLS + WAF active</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Session Started</div>
+                <div class="card-value card-value-sm" id="session-time">{{ login_time[:16].replace("T", " ") }} UTC</div>
+                <div class="card-sub">Current session</div>
+            </div>
+
+        </div>
+
+        <!-- Infrastructure Status -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Infrastructure Health</h2>
+                <button class="btn btn-ghost btn-sm" onclick="refreshStatus()">Refresh</button>
+            </div>
+
+            <div class="infra-grid" id="infra-status">
+                <div class="infra-item">
+                    <div class="infra-name">Nginx Proxy</div>
+                    <div class="infra-detail">Port 8443 · TLS 1.3</div>
+                    <span class="badge badge-green">Healthy</span>
+                </div>
+                <div class="infra-item">
+                    <div class="infra-name">Apache2 Server</div>
+                    <div class="infra-detail">Port 8080 · Backend</div>
+                    <span class="badge badge-green">Healthy</span>
+                </div>
+                <div class="infra-item">
+                    <div class="infra-name">Flask Application</div>
+                    <div class="infra-detail">Port 5000 · Gunicorn</div>
+                    <span class="badge badge-green">Healthy</span>
+                </div>
+                <div class="infra-item">
+                    <div class="infra-name">Cloud WAF</div>
+                    <div class="infra-detail">Cloud Armor · 12 rules</div>
+                    <span class="badge badge-green">Active</span>
+                </div>
+                <div class="infra-item">
+                    <div class="infra-name">Secret Manager</div>
+                    <div class="infra-detail">TLS certs · Encrypted</div>
+                    <span class="badge badge-green">Secured</span>
+                </div>
+                <div class="infra-item">
+                    <div class="infra-name">Artifact Registry</div>
+                    <div class="infra-detail">us-central1 · Scanned</div>
+                    <span class="badge badge-green">Active</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Table -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Recent Transactions</h2>
+                <span class="section-count">{{ transactions|length }} records</span>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                        <tr>
+                            <td class="txn-id">{{ tx.id }}</td>
+                            <td>{{ tx.date }}</td>
+                            <td>{{ tx.description }}</td>
+                            <td class="{% if '+' in tx.amount %}amount-credit{% else %}amount-debit{% endif %}">
+                                {{ tx.amount }}
+                            </td>
+                            <td>
+                                <span class="badge {% if tx.status == 'completed' %}badge-green{% else %}badge-yellow{% endif %}">
+                                    {{ tx.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
