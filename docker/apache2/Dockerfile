@@ -14,8 +14,8 @@ RUN groupadd -g 1001 apache-grp && \
 COPY httpd.conf    /etc/apache2/apache2.conf
 COPY security.conf /etc/apache2/conf-enabled/security.conf
 
-RUN chown -R apache-usr:apache-grp /var/www /var/log/apache2 \
-    /var/run/apache2 /etc/apache2 && \
+RUN mkdir -p /run/apache2 && \
+    chown -R apache-usr:apache-grp /var/www /var/log/apache2 /run/apache2 /etc/apache2 && \
     chmod 750 /var/log/apache2
 
 USER apache-usr:apache-grp
